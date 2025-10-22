@@ -169,6 +169,9 @@ else:
 today = date.today()
 start_date = str(date.today() - timedelta(days=2000))
 results = []
+# initialize with expected columns
+stock_data_df = pd.DataFrame(columns=["Date", "Ticker", "Open", "High", "Low", "Close", "Volume"])
+df = pd.DataFrame(columns=["Date", "Ticker", "Open", "High", "Low", "Close", "Volume"])
 print(equity_list)
 
 for i, equity in enumerate(equity_list):
@@ -176,8 +179,11 @@ for i, equity in enumerate(equity_list):
 
     investment = 100000
     # --- 1. Load data ---
-    stock_data_df = pd.read_csv("stock_data.csv")
-    df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
+    try:
+        stock_data_df = pd.read_csv("stock_data.csv")
+        df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
+        print(df)
+    except: pass
 
     if len(df) == 0:
         df_new = yfdownload(equity,start_date)
@@ -188,6 +194,7 @@ for i, equity in enumerate(equity_list):
         stock_data_df = pd.read_csv("stock_data.csv")
         df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
         print(df.tail(5))
+
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce', infer_datetime_format=True)
     last_data_date = df["Date"].iloc[-1]
     today = pd.Timestamp.today().normalize()
