@@ -187,7 +187,7 @@ for i, equity in enumerate(equity_list):
         df_new = yfdownload(equity,start_date)
         # --- Append or replace in main DataFrame ---
         stock_data_df = pd.concat([stock_data_df, df_new], ignore_index=True)
-        stock_data_df = stock_data_df.unique()
+        stock_data_df = stock_data_df.drop_duplicates()
         stock_data_df.to_csv("stock_data.csv", index=False)
         stock_data_df = pd.read_csv("stock_data.csv")
         df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
