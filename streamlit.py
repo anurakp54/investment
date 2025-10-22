@@ -148,7 +148,18 @@ with st.sidebar:
         equity_list.extend(stock_manual_list)
 
 # --- Display selected stocks ---
-st.write("### Selected Equities:")
+st.write("### Portfolio Management:")
+st.markdown(
+    """
+    <small>
+    **Disclaimer:** This application is provided for informational purposes only.  
+    It does not constitute financial advice, and no guarantee of profit or protection against loss is implied.  
+    Investment decisions are made at the sole discretion and risk of the investor.  
+    The developers and providers of this application assume no liability for any financial losses or damages that may result from its use.
+    </small>
+    """,
+    unsafe_allow_html=True
+)
 if equity_list:
     st.write(equity_list)
 else:
