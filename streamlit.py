@@ -187,11 +187,10 @@ for i, equity in enumerate(equity_list):
         stock_data_df.to_csv("stock_data.csv", index=False)
         stock_data_df = pd.read_csv("stock_data.csv")
         df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
-
-    df['Date'] = pd.to_datetime(df['Date'])
+        print(df.tail(5))
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce', infer_datetime_format=True)
     last_data_date = df["Date"].iloc[-1]
     today = pd.Timestamp.today().normalize()
-    print(df.tail(5))
 
     if (today - last_data_date).days > 2:
         # Download new data
