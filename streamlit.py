@@ -11,6 +11,24 @@ plt.style.use('fivethirtyeight')
 
 st.set_page_config(layout='wide')
 
+def yfdownload(equity,start_date):
+    # Download new data
+    df_new = yf.download(equity, start=start_date, end=today, group_by='ticker')
+
+    # --- Flatten MultiIndex if exists ---
+    if isinstance(df_new.columns, pd.MultiIndex):
+        df_new = df_new[equity].copy()
+
+    # Reset index and add Ticker column
+    df_new.reset_index(inplace=True)
+    df_new["Ticker"] = equity
+
+    # Ensure consistent column order
+    df_new = df_new[['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Ticker']]
+
+    return df_new
+
+
 def compute_unrealized(row):
     if row['in position'] and row['number_of_stock'] > 0:
         return row['number_of_stock'] * (row['price'] - row['buy_price'])
@@ -116,7 +134,8 @@ stocks = [
 
 # INPUT STOCK and CHECK Data if avaliable and uptodate
 with st.sidebar:
-    stock = st.text_input("Enter Stock Name", "PTT.BK")
+    stock_manual = st.text_input('[AAPL, GOOG, MSFT, "AMZN"]')
+    stock_manual_list = [s.strip() for s in stock_manual.split(',') if s.strip()]
     period = st.slider('Period', 0, 720, value=250, step=10)
 
     # --- Create checkboxes in sidebar (each with a unique key) ---
@@ -124,6 +143,9 @@ with st.sidebar:
     for i, stock in enumerate(stocks):
         if st.sidebar.checkbox(stock, key=f"chk_{i}"):
             equity_list.append(stock)
+
+    if stock_manual_list:
+        equity_list.extend(stock_manual_list)
 
 # --- Display selected stocks ---
 st.write("### Selected Equities:")
@@ -133,16 +155,43 @@ else:
     st.info("No equities selected yet.")
 
 
-today = str(date.today())
+today = date.today()
 start_date = str(date.today() - timedelta(days=2000))
 results = []
+print(equity_list)
+
 for i, equity in enumerate(equity_list):
+    print(f'equity: {equity}')
 
     investment = 100000
     # --- 1. Load data ---
     stock_data_df = pd.read_csv("stock_data.csv")
     df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
+
+    if len(df) == 0:
+        df_new = yfdownload(equity,start_date)
+        # --- Append or replace in main DataFrame ---
+        stock_data_df = pd.concat([stock_data_df, df_new], ignore_index=True)
+        stock_data_df = stock_data_df.drop_duplicates()
+        stock_data_df.to_csv("stock_data.csv", index=False)
+        stock_data_df = pd.read_csv("stock_data.csv")
+        df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
+
+    df['Date'] = pd.to_datetime(df['Date'])
+    last_data_date = df["Date"].iloc[-1]
+    today = pd.Timestamp.today().normalize()
     print(df.tail(5))
+
+    if (today - last_data_date).days > 2:
+        # Download new data
+        df_new = yfdownload(equity,start_date)
+        # --- Append or replace in main DataFrame ---
+        stock_data_df = pd.concat([stock_data_df, df_new], ignore_index=True)
+        stock_data_df = stock_data_df.unique()
+        stock_data_df.to_csv("stock_data.csv", index=False)
+        stock_data_df = pd.read_csv("stock_data.csv")
+        df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
+
     df = df[-1200:]
 
     df['Date'] = pd.to_datetime(df['Date'])
