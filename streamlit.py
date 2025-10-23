@@ -303,7 +303,7 @@ for i, equity in enumerate(equity_list):
             # --- 3. Compute cumulative profit ---
             df['cum_profit'] = df['profit'].cumsum()
             print(df[df['profit'] != 0][['Close', 'profit', 'cum_profit']])
-            print('initial investment = 100,000 THB')
+            print('initial investment = 100,000 local currency')
             print(f'Current Portfolio Value: {investment}, {((investment - 100000) / 100000):.2%},\n'
                   f'price * stocks: {buy_price} x {number_of_stock}')
 
