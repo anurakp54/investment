@@ -209,7 +209,7 @@ for i, equity in enumerate(equity_list):
         stock_data_df = pd.read_csv("stock_data.csv")
         df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
 
-    df = df[-1200:]
+    df = df[-period:]
 
     df['Date'] = pd.to_datetime(df['Date'])
     df = df.set_index('Date')
