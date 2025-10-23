@@ -209,8 +209,6 @@ for i, equity in enumerate(equity_list):
         stock_data_df = pd.read_csv("stock_data.csv")
         df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
 
-    df = df[-period:]
-
     df['Date'] = pd.to_datetime(df['Date'])
     df = df.set_index('Date')
     df['return'] = df['Close'].pct_change()
@@ -221,7 +219,7 @@ for i, equity in enumerate(equity_list):
     df['rolling_mean_ln_r'] = df['ln_r'].rolling(window=30).mean()
     df['moving_avg_rolling_mean'] = df['rolling_mean_ln_r'].rolling(window=60).mean()
 
-    df = df[-250:]  # filter data to last 250 days
+    df = df[-period:]  # filter data to last 250 days
 
     if df.iloc[-1]['Close'] >= df.iloc[-1]['200d']:
         try:
