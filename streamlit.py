@@ -198,6 +198,7 @@ for i, equity in enumerate(equity_list):
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce', infer_datetime_format=True)
     last_data_date = df["Date"].iloc[-1]
     today = pd.Timestamp.today().normalize()
+    print(f'last data date:{last_data_date}, {(today - last_data_date).days}')
 
     if (today - last_data_date).days > 2:
         # Download new data
