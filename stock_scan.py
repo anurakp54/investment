@@ -7,6 +7,23 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.lines import lineStyles
 
+def yfdownload(equity,start_date,today):
+    # Download new data
+    df_new = yf.download(equity, start=start_date, end=today, group_by='ticker')
+
+    # --- Flatten MultiIndex if exists ---
+    if isinstance(df_new.columns, pd.MultiIndex):
+        df_new = df_new[equity].copy()
+
+    # Reset index and add Ticker column
+    df_new.reset_index(inplace=True)
+    df_new["Ticker"] = equity
+
+    # Ensure consistent column order
+    df_new = df_new[['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Ticker']]
+
+    return df_new
+
 def plot_result(df,equity):
     fig, ax1 = plt.subplots(figsize=(14, 7))
     ax1.plot(df.index, df['Close'], label='Close Price', color='blue')
@@ -71,15 +88,42 @@ def stock_scan(equity_list):
 
         investment = 100000
         # --- 1. Load data ---
-        stock_data_df = pd.read_csv("stock_data.csv")
-        df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
-        print(df.tail(5))
-        df = df[-1200:]
+        try:
+            stock_data_df = pd.read_csv("stock_data.csv")
+        except:
+            stock_data_df = pd.DataFrame(columns=df.columns)
 
-        df['Date'] = pd.to_datetime(df['Date'])
+        df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce').dt.normalize()
+        if df.empty:
+            pass
+        else:
+            last_data_date = df["Date"].iloc[-1]
+
+        today = pd.Timestamp.today().normalize()
+        start_date = str(date.today() - timedelta(days=2000))
+
+        if len(df) == 0 or (today - last_data_date).days > 2 or df.empty:
+            df_new = yfdownload(equity, start_date,today)
+            # --- Append only new rows (avoid duplicates on Date + Ticker) ---
+            existing_pairs = set(zip(df["Date"], df["Ticker"]))
+            mask_new = ~df_new.apply(lambda row: (str(row["Date"]), row["Ticker"]) in existing_pairs, axis=1)
+            new_rows = df_new[mask_new]
+
+            stock_data_df = pd.concat([stock_data_df, new_rows], ignore_index=True)
+            stock_data_df = stock_data_df.drop_duplicates()
+            stock_data_df.to_csv("stock_data.csv", index=False)
+            stock_data_df = pd.read_csv("stock_data.csv")
+            df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
+
+        last_data_date = df["Date"].iloc[-1]
+        print(f'lastdate : {last_data_date}')
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce').dt.normalize()
         df = df.set_index('Date')
         df['return'] = df['Close'].pct_change()
         df['ln_r'] = np.log(1 + df['return'])
+        # Drop NaN values first
+        ln_r = df['ln_r'].dropna()
 
         # --- Rolling statistics ---
         df['200d'] = df['Close'].rolling(window=200).mean()

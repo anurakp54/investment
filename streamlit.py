@@ -17,7 +17,7 @@ def get_stock_summary(stocks):
     summary, margin = sc.stock_scan(stocks)
     return summary, margin
 
-def yfdownload(equity,start_date):
+def yfdownload(equity,start_date,today):
     # Download new data
     df_new = yf.download(equity, start=start_date, end=today, group_by='ticker')
 
@@ -204,7 +204,7 @@ for i, equity in enumerate(equity_list):
     today = pd.Timestamp.today().normalize()
 
     if len(df) == 0 or (today - last_data_date).days > 2 or df.empty:
-        df_new = yfdownload(equity,start_date)
+        df_new = yfdownload(equity,start_date,today)
         # --- Append only new rows (avoid duplicates on Date + Ticker) ---
         existing_pairs = set(zip(df["Date"], df["Ticker"]))
         mask_new = ~df_new.apply(lambda row: (str(row["Date"]), row["Ticker"]) in existing_pairs, axis=1)
