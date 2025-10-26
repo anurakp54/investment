@@ -50,7 +50,7 @@ def plot_result(df,equity):
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
 
-directory = "/Users/mac/PycharmProjects/Data/Stock"
+#directory = "/Users/mac/PycharmProjects/Data/Stock"
 
 equity_list = ['PTT.BK','PTTEP.BK', 'AOT.BK','KTB.BK','BBL.BK', 'SCB.BK', 'KBANK.BK', 'ADVANC.BK', 'DELTA.BK', 'AP.BK',
                'CRC.BK','CPALL.BK','GULF.BK','HMPRO.BK','CK.BK','STECON.BK','BDMS.BK','BH.BK','AAV.BK','AEONTS.BK','AMATA.BK',
@@ -71,7 +71,7 @@ def stock_scan(equity_list):
 
         investment = 100000
         # --- 1. Load data ---
-        stock_data_df = pd.read_csv(os.path.join(directory, "stock_data.csv"))
+        stock_data_df = pd.read_csv("stock_data.csv")
         df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
         print(df.tail(5))
         df = df[-1200:]
