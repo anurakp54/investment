@@ -6,10 +6,16 @@ import yfinance as yf
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import stock_scan as sc
 
 plt.style.use('fivethirtyeight')
 
 st.set_page_config(layout='wide')
+
+@st.cache_data
+def get_stock_summary(stocks):
+    summary, margin = sc.stock_scan(stocks)
+    return summary, margin
 
 def yfdownload(equity,start_date):
     # Download new data
@@ -132,6 +138,10 @@ stocks = [
     'TOP.BK','TRUE.BK','TTB.BK','TU.BK','VGI.BK','WHA.BK','WHAUP.BK'
 ]
 
+summary, margin = get_stock_summary(stocks)
+st.write(summary)
+st.write(f'overall margin: {margin:,.2%}')
+
 # INPUT STOCK and CHECK Data if avaliable and uptodate
 with st.sidebar:
     stock_manual = st.text_input('[AAPL, GOOG, MSFT, "AMZN"]')
@@ -181,39 +191,40 @@ for i, equity in enumerate(equity_list):
     # --- 1. Load data ---
     try:
         stock_data_df = pd.read_csv("stock_data.csv")
-        df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
-        print(df)
-    except: pass
+    except:
+        stock_data_df = pd.DataFrame(columns=df.columns)
 
-    if len(df) == 0:
-        df_new = yfdownload(equity,start_date)
-        # --- Append or replace in main DataFrame ---
-        stock_data_df = pd.concat([stock_data_df, df_new], ignore_index=True)
-        stock_data_df = stock_data_df.drop_duplicates()
-        stock_data_df.to_csv("stock_data.csv", index=False)
-        stock_data_df = pd.read_csv("stock_data.csv")
-        df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
-        print(df.tail(5))
+    df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce').dt.normalize()
+    if df.empty:
+        pass
+    else:
+        last_data_date = df["Date"].iloc[-1]
 
-    df['Date'] = pd.to_datetime(df['Date'], errors='coerce', infer_datetime_format=True)
-    last_data_date = df["Date"].iloc[-1]
     today = pd.Timestamp.today().normalize()
-    print(f'last data date:{last_data_date}, {(today - last_data_date).days}')
 
-    if (today - last_data_date).days > 2:
-        # Download new data
+    if len(df) == 0 or (today - last_data_date).days > 2 or df.empty:
         df_new = yfdownload(equity,start_date)
-        # --- Append or replace in main DataFrame ---
-        stock_data_df = pd.concat([stock_data_df, df_new], ignore_index=True)
+        # --- Append only new rows (avoid duplicates on Date + Ticker) ---
+        existing_pairs = set(zip(df["Date"], df["Ticker"]))
+        mask_new = ~df_new.apply(lambda row: (str(row["Date"]), row["Ticker"]) in existing_pairs, axis=1)
+        new_rows = df_new[mask_new]
+
+        stock_data_df = pd.concat([stock_data_df, new_rows], ignore_index=True)
         stock_data_df = stock_data_df.drop_duplicates()
         stock_data_df.to_csv("stock_data.csv", index=False)
         stock_data_df = pd.read_csv("stock_data.csv")
         df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
 
-    df['Date'] = pd.to_datetime(df['Date'])
+
+    last_data_date = df["Date"].iloc[-1]
+    print(f'lastdate : {last_data_date}')
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce').dt.normalize()
     df = df.set_index('Date')
     df['return'] = df['Close'].pct_change()
     df['ln_r'] = np.log(1 + df['return'])
+    # Drop NaN values first
+    ln_r = df['ln_r'].dropna()
 
     # --- Rolling statistics ---
     df['200d'] = df['Close'].rolling(window=200).mean()
@@ -224,7 +235,6 @@ for i, equity in enumerate(equity_list):
 
     if df.iloc[-1]['Close'] >= df.iloc[-1]['200d']:
         try:
-
             # --- Initialize trading columns ---
             df['position'] = 0      # 1 = buy, -1 = sell, 0 = hold
             df['cum_return'] = 0.0  # return since last buy
