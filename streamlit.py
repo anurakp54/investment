@@ -195,16 +195,20 @@ for i, equity in enumerate(equity_list):
         stock_data_df = pd.DataFrame(columns=df.columns)
 
     df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
-    df['Date'] = pd.to_datetime(df['Date'], errors='coerce').dt.normalize()
+    df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d %H:%M:%S', errors='coerce').dt.normalize()
+
     if df.empty:
-        pass
+        last_data_date = date.today() - timedelta(days=20)
     else:
         last_data_date = df["Date"].iloc[-1]
 
     today = pd.Timestamp.today().normalize()
+    print(f'today: {today}')
 
-    if len(df) == 0 or (today - last_data_date).days > 2 or df.empty:
+    if len(df) == 0 or (today - last_data_date).days >= 2 or df.empty:
         df_new = yfdownload(equity,start_date,today)
+        # drop data today
+        df_new = df_new[df_new['Date'] != today]
         # --- Append only new rows (avoid duplicates on Date + Ticker) ---
         existing_pairs = set(zip(df["Date"], df["Ticker"]))
         mask_new = ~df_new.apply(lambda row: (str(row["Date"]), row["Ticker"]) in existing_pairs, axis=1)
@@ -216,10 +220,10 @@ for i, equity in enumerate(equity_list):
         stock_data_df = pd.read_csv("stock_data.csv")
         df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
 
-
+    df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d %H:%M:%S', errors='coerce').dt.normalize()
     last_data_date = df["Date"].iloc[-1]
+    print(df.tail())
     print(f'lastdate : {last_data_date}')
-    df['Date'] = pd.to_datetime(df['Date'], errors='coerce').dt.normalize()
     df = df.set_index('Date')
     df['return'] = df['Close'].pct_change()
     df['ln_r'] = np.log(1 + df['return'])

@@ -91,7 +91,7 @@ def stock_scan(equity_list):
         try:
             stock_data_df = pd.read_csv("stock_data.csv")
         except:
-            stock_data_df = pd.DataFrame(columns=df.columns)
+            stock_data_df = pd.DataFrame(columns=["Date", "Ticker", "Open", "High", "Low", "Close", "Volume"])
 
         df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce').dt.normalize()
@@ -122,8 +122,6 @@ def stock_scan(equity_list):
         df = df.set_index('Date')
         df['return'] = df['Close'].pct_change()
         df['ln_r'] = np.log(1 + df['return'])
-        # Drop NaN values first
-        ln_r = df['ln_r'].dropna()
 
         # --- Rolling statistics ---
         df['200d'] = df['Close'].rolling(window=200).mean()
