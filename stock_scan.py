@@ -67,25 +67,9 @@ def plot_result(df,equity):
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
 
-#directory = "/Users/mac/PycharmProjects/Data/Stock"
-
-equity_list = ['PTT.BK','PTTEP.BK', 'AOT.BK','KTB.BK','BBL.BK', 'SCB.BK', 'KBANK.BK', 'ADVANC.BK', 'DELTA.BK', 'AP.BK',
-               'CRC.BK','CPALL.BK','GULF.BK','HMPRO.BK','CK.BK','STECON.BK','BDMS.BK','BH.BK','AAV.BK','AEONTS.BK','AMATA.BK',
-               'AURA.BK','AWC.BK','BA.BK','BAM.BK','BANPU.BK','BCH.BK','BCP.BK','BCPG.BK','BDMS.BK','BEM.BK',
-               'BGRIM.BK','BJC.BK','BLA.BK','BTG.BK','CBG.BK','CCET.BK','CENTEL.BK','CHG.BK','COM7.BK','CPF.BK','CPN.BK',
-               'CRC.BK','DOHOME.BK','EA.BK','EGCO.BK','ERW.BK','GLOBAL.BK','GPSC.BK','GULF.BK','GUNKUL.BK','HANA.BK',
-               'HMPRO.BK','ICHI.BK','IRPC.BK','ITC.BK','IVL.BK','JAS.BK','JMART.BK','JMT.BK','JTS.BK','KCE.BK',
-               'KKP.BK','LH.BK','M.BK','MBK.BK','MEGA.BK','MINT.BK','MOSHI.BK','MTC.BK','OR.BK','OSP.BK','PLANB.BK','PR9.BK',
-               'PRM.BK','PTTGC.BK','QH.BK','RATCH.BK','RCL.BK','SAWAD.BK','SCC.BK','SCGP.BK','SIRI.BK','SISB.BK','SJWD.BK',
-               'SPALI.BK','SPRC.BK','STA.BK','STGT.BK','TASCO.BK','TCAP.BK','TFG.BK','TIDLOR.BK','TISCO.BK','TLI.BK','TOA.BK',
-               'TOP.BK','TRUE.BK','TTB.BK','TU.BK','VGI.BK','WHA.BK','WHAUP.BK']
-
-results = []
-
 def stock_scan(equity_list):
-
+    results = []
     for i, equity in enumerate(equity_list):
-
         investment = 100000
         # --- 1. Load data ---
         try:
@@ -95,6 +79,7 @@ def stock_scan(equity_list):
 
         df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce').dt.normalize()
+
         if df.empty:
             pass
         else:
@@ -234,7 +219,7 @@ def stock_scan(equity_list):
             except:pass
 
     result = pd.DataFrame(results)
-
+    print(result)
 
     # Optional: compute unrealized profit for stocks still in position
     def compute_unrealized(row):
@@ -276,3 +261,8 @@ def stock_scan(equity_list):
 
 #while plt.get_fignums():
 #    plt.pause(0.1)
+
+if __name__ == "__main__":
+    results = []
+    stocks = ['PTTEP.BK']
+    summary, margin = stock_scan(stocks)
