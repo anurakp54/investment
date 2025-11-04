@@ -195,14 +195,22 @@ for i, equity in enumerate(equity_list):
         stock_data_df = pd.DataFrame(columns=df.columns)
 
     df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
+
+    # 1. Parse all date formats automatically
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+
+    # 2. Format them to the desired string format
+    df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
+
     print(df.tail())
-    df['Date'] = pd.to_datetime(df['Date'],format='%Y-%m-%d %H:%M:%S',errors='coerce').dt.normalize()
+
     if df.empty:
         last_data_date = date.today() - timedelta(days=20)
     else:
         last_data_date = df["Date"].iloc[-1]
 
     today = pd.Timestamp.today().normalize()
+    last_data_date = pd.to_datetime(last_data_date)
     print(f'today: {today}')
 
     if len(df) == 0 or (today - last_data_date).days >= 2 or df.empty:
@@ -215,12 +223,16 @@ for i, equity in enumerate(equity_list):
         new_rows = df_new[mask_new]
 
         stock_data_df = pd.concat([stock_data_df, new_rows], ignore_index=True)
-        stock_data_df = stock_data_df.drop_duplicates()
+        stock_data_df = stock_data_df.drop_duplicates(subset=['Ticker', 'Date'])
         stock_data_df.to_csv("stock_data.csv", index=False)
         stock_data_df = pd.read_csv("stock_data.csv")
         df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
 
-    df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d %H:%M:%S', errors='coerce').dt.normalize()
+    # 1. Parse all date formats automatically
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+
+    # 2. Format them to the desired string format
+    df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
     last_data_date = df["Date"].iloc[-1]
     print(df.tail())
     print(f'lastdate : {last_data_date}')
