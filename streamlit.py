@@ -139,6 +139,7 @@ stocks = [
 ]
 
 summary, margin = get_stock_summary(stocks)
+summary = pd.DataFrame(summary)
 st.write(summary)
 st.write(f'overall margin: {margin:,.2%}')
 
@@ -200,7 +201,7 @@ for i, equity in enumerate(equity_list):
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
     # 2. Format them to the desired string format
-    df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
+    df['Date'] = df['Date'].dt.strftime('%Y-%m-%d %H:%M:%S')
 
     print(df.tail())
 
@@ -230,9 +231,8 @@ for i, equity in enumerate(equity_list):
 
     # 1. Parse all date formats automatically
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-
     # 2. Format them to the desired string format
-    df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
+    df['Date'] = df['Date'].dt.strftime('%Y-%m-%d %H:%M:%S')
     last_data_date = df["Date"].iloc[-1]
     print(df.tail())
     print(f'lastdate : {last_data_date}')
@@ -247,7 +247,8 @@ for i, equity in enumerate(equity_list):
 
     df = df[-period:]  # filter data to last 250 days
 
-    if df.iloc[-1]['Close'] >= df.iloc[-1]['200d']:
+    if (df.iloc[-1]['Close'] >= df.iloc[-1]['200d']) or (summary[summary['equity']==equity]['in position'].values[0] == True):
+        print('In Position')
         try:
             # --- Initialize trading columns ---
             df['position'] = 0      # 1 = buy, -1 = sell, 0 = hold
@@ -349,7 +350,7 @@ for i, equity in enumerate(equity_list):
             plt.show(block=False)
         except:pass
 
-    else: pass
+    else: print('Not in position')
 
 result = pd.DataFrame(results)
 st.write(result)
