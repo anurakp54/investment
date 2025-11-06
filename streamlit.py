@@ -246,8 +246,12 @@ for i, equity in enumerate(equity_list):
     df['moving_avg_rolling_mean'] = df['rolling_mean_ln_r'].rolling(window=60).mean()
 
     df = df[-period:]  # filter data to last 250 days
+    try:
+        check_if_equity_is_on_list = summary[summary['equity'] == equity]['in position'].values[0]
+    except:
+        check_if_equity_is_on_list = False
 
-    if (df.iloc[-1]['Close'] >= df.iloc[-1]['200d']) or (summary[summary['equity']==equity]['in position'].values[0] == True):
+    if (df.iloc[-1]['Close'] >= df.iloc[-1]['200d']) or check_if_equity_is_on_list == True:
         print('In Position')
         try:
             # --- Initialize trading columns ---
