@@ -251,110 +251,113 @@ for i, equity in enumerate(equity_list):
     except:
         check_if_equity_is_on_list = False
 
-    if (df.iloc[-1]['Close'] >= df.iloc[-1]['200d']) or check_if_equity_is_on_list == True:
-        print('In Position')
-        try:
-            # --- Initialize trading columns ---
-            df['position'] = 0      # 1 = buy, -1 = sell, 0 = hold
-            df['cum_return'] = 0.0  # return since last buy
-            df['profit'] = 0.0      # profit of each completed trade
-            df['cum_profit'] = 0.0  # cumulative profit
+    #if (df.iloc[-1]['Close'] >= df.iloc[-1]['200d']) or check_if_equity_is_on_list == True:
+    #    print('In Position')
 
-            # --- 2. Trading loop: buy first, sell alternately ---
-            in_position = False
-            buy_price = None
-            buy_index = None
-            sell_index = None
-            days_after_sell = 0
-            number_of_stock = 0
-            investment = 100000  # starting capital
-            df['position'] = 0
-            df['profit'] = 0.0
+    # --- Initialize trading columns ---
+    df['position'] = 0      # 1 = buy, -1 = sell, 0 = hold
+    df['cum_return'] = 0.0  # return since last buy
+    df['profit'] = 0.0      # profit of each completed trade
+    df['cum_profit'] = 0.0  # cumulative profit
 
-            for i, index in enumerate(df.index):
-                if i < 3:
-                    continue
+    # --- 2. Trading loop: buy first, sell alternately ---
+    in_position = False
+    buy_price = None
+    buy_index = None
+    sell_index = None
+    days_after_sell = 0
+    number_of_stock = 0
+    investment = 100000  # starting capital
+    df['position'] = 0
+    df['profit'] = 0.0
 
-                price = df.loc[index, 'Close']
+    for i, index in enumerate(df.index):
+        if i < 3:
+            continue
 
-                # detect rebound for buy
-                ma_min = df['moving_avg_rolling_mean'].min()
-                ma_max = df['moving_avg_rolling_mean'].max()
-                ma_threshold = ma_min + 0.5 * (ma_max - ma_min)
+        price = df.loc[index, 'Close']
 
-                ma_prev3 = df.iloc[i - 3]['moving_avg_rolling_mean']
-                ma_prev2 = df.iloc[i - 2]['moving_avg_rolling_mean']
-                ma_prev1 = df.iloc[i - 1]['moving_avg_rolling_mean']
-                ma_curr = df.iloc[i]['moving_avg_rolling_mean']
-                ma_rebound_signal = (ma_curr <= ma_threshold and
-                                     ma_curr > ma_prev1 and ma_prev1 > ma_prev2)
+        # detect rebound for buy
+        ma_min = df['moving_avg_rolling_mean'].min()
+        ma_max = df['moving_avg_rolling_mean'].max()
+        ma_threshold = ma_min + 0.5 * (ma_max - ma_min)
 
-                ma_reverse_signal = ma_curr < ma_prev1 and ma_prev1 < ma_prev2
+        ma_prev3 = df.iloc[i - 3]['moving_avg_rolling_mean']
+        ma_prev2 = df.iloc[i - 2]['moving_avg_rolling_mean']
+        ma_prev1 = df.iloc[i - 1]['moving_avg_rolling_mean']
+        ma_curr = df.iloc[i]['moving_avg_rolling_mean']
+        ma_rebound_signal = (ma_curr <= ma_threshold and
+                             ma_curr > ma_prev1 and ma_prev1 > ma_prev2)
 
-                days_after_sell += 1
+        ma_reverse_signal = ma_curr < ma_prev1 and ma_prev1 < ma_prev2
 
-                # --- BUY ---
-                if not in_position:
-                    if pd.notna(ma_curr) and ma_rebound_signal and (price / df.loc[index, '200d']) >= 1 and days_after_sell > 15:
-                        df.loc[index, 'position'] = 1
-                        buy_price = price
-                        buy_index = index
-                        in_position = True
-                        number_of_stock = investment / buy_price
-                        print('buy price:', buy_price)
-                        print('number of stock:', number_of_stock)
+        days_after_sell += 1
 
-                # --- SELL ---
-                else:  # only if we are in a position
-                    cum_return = (price - buy_price) / buy_price
+        # --- BUY ---
+        if not in_position:
+            if pd.notna(ma_curr) and ma_rebound_signal and (price / df.loc[index, '200d']) >= 1 and days_after_sell > 15:
+                df.loc[index, 'position'] = 1
+                buy_price = price
+                buy_index = index
+                in_position = True
+                number_of_stock = investment / buy_price
+                print('buy price:', buy_price)
+                print('number of stock:', number_of_stock)
 
-                    # sell conditions
-                    sell_condition = (
-                        (cum_return >= 0.1 and ma_reverse_signal) or
-                        (cum_return <= -0.5 and (price / df.loc[index, '200d']) < 1)
-                    )
+        # --- SELL ---
+        else:  # only if we are in a position
+            cum_return = (price - buy_price) / buy_price
 
-                    if sell_condition:
-                        sell_price = price
-                        investment = sell_price * number_of_stock
-                        df.loc[index, 'position'] = -1
-                        df.loc[index, 'profit'] = (sell_price - buy_price)*number_of_stock
-                        sell_index = index
-                        number_of_stock = 0
-                        days_after_sell = 0
-                        # reset state
-                        in_position = False
+            # sell conditions
+            sell_condition = (
+                (cum_return >= 0.1 and ma_reverse_signal) or
+                (cum_return <= -0.5 and (price / df.loc[index, '200d']) < 1)
+            )
 
-                        print('sell date: ', sell_index )
-                        print('sell price: ', sell_price)
-                        print('buy price: ', buy_price)
-                        print('profit: ', (sell_price - buy_price)*number_of_stock)
+            if sell_condition:
+                sell_price = price
+                investment = sell_price * number_of_stock
+                df.loc[index, 'position'] = -1
+                df.loc[index, 'profit'] = (sell_price - buy_price)*number_of_stock
+                sell_index = index
+                number_of_stock = 0
+                days_after_sell = 0
+                # reset state
+                in_position = False
 
-            # --- 3. Compute cumulative profit ---
-            df['cum_profit'] = df['profit'].cumsum()
-            print(df[df['profit'] != 0][['Close', 'profit', 'cum_profit']])
-            print('initial investment = 100,000 local currency')
-            print(f'Current Portfolio Value: {investment}, {((investment - 100000) / 100000):.2%},\n'
-                  f'price * stocks: {buy_price} x {number_of_stock}')
+                print('sell date: ', sell_index )
+                print('sell price: ', sell_price)
+                print('buy price: ', buy_price)
+                print('profit: ', (sell_price - buy_price)*number_of_stock)
 
-            row_result = {
-                'equity': equity,
-                'price': price,
-                'in position': in_position,
-                'number_of_stock': number_of_stock,
-                'buy_price': buy_price if in_position else 0.0,  # store the buy price if in position
-                'cum_profit': df['cum_profit'].iloc[-1] if not df['cum_profit'].empty else 0.0,
-                'current_portfolio_value': investment,
-                'profit_margin': ((investment - 100000) / 100000)
-            }
-            results.append(row_result)
+    # --- 3. Compute cumulative profit ---
+    df['cum_profit'] = df['profit'].cumsum()
+    print(df[df['profit'] != 0][['Close', 'profit', 'cum_profit']])
+    print('initial investment = 100,000 local currency')
+    print(f'Current Portfolio Value: {investment}, {((investment - 100000) / 100000):.2%},\n'
+          f'price * stocks: {buy_price} x {number_of_stock}')
 
-            # 4. plot result
-            plot_result_altair(df, equity)
-            plt.show(block=False)
-        except:pass
+    row_result = {
+        'equity': equity,
+        'price': price,
+        'in position': in_position,
+        'number_of_stock': number_of_stock,
+        'buy_price': buy_price if in_position else 0.0,  # store the buy price if in position
+        'cum_profit': df['cum_profit'].iloc[-1] if not df['cum_profit'].empty else 0.0,
+        'current_portfolio_value': investment,
+        'profit_margin': ((investment - 100000) / 100000)
+    }
+    results.append(row_result)
 
-    else: print('Not in position')
+    # 4. plot result
+    plot_result_altair(df, equity)
+    plt.show(block=False)
+
+
+    #else:
+    #    print('Not in position')
+    #    plot_result_altair(df, equity)
+    #    plt.show(block=False)
 
 result = pd.DataFrame(results)
 st.write(result)
