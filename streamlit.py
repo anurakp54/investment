@@ -125,18 +125,19 @@ def plot_result_altair(df, equity):
     st.altair_chart(final_chart, use_container_width=True)
 
 
-stocks = [
-    'PTT.BK','PTTEP.BK', 'AOT.BK','KTB.BK','BBL.BK', 'SCB.BK', 'KBANK.BK', 'ADVANC.BK', 'DELTA.BK', 'AP.BK',
-    'CRC.BK','CPALL.BK','GULF.BK','HMPRO.BK','CK.BK','STECON.BK','BDMS.BK','BH.BK','AAV.BK','AEONTS.BK','AMATA.BK',
-    'AURA.BK','AWC.BK','BA.BK','BAM.BK','BANPU.BK','BCH.BK','BCP.BK','BCPG.BK','BDMS.BK','BEM.BK',
-    'BGRIM.BK','BJC.BK','BLA.BK','BTG.BK','CBG.BK','CCET.BK','CENTEL.BK','CHG.BK','COM7.BK','CPF.BK','CPN.BK',
-    'CRC.BK','DOHOME.BK','EA.BK','EGCO.BK','ERW.BK','GLOBAL.BK','GPSC.BK','GULF.BK','GUNKUL.BK','HANA.BK',
-    'HMPRO.BK','ICHI.BK','IRPC.BK','ITC.BK','IVL.BK','JAS.BK','JMART.BK','JMT.BK','JTS.BK','KCE.BK',
-    'KKP.BK','LH.BK','M.BK','MBK.BK','MEGA.BK','MINT.BK','MOSHI.BK','MTC.BK','OR.BK','OSP.BK','PLANB.BK','PR9.BK',
-    'PRM.BK','PTTGC.BK','QH.BK','RATCH.BK','RCL.BK','SAWAD.BK','SCC.BK','SCGP.BK','SIRI.BK','SISB.BK','SJWD.BK',
-    'SPALI.BK','SPRC.BK','STA.BK','STGT.BK','TASCO.BK','TCAP.BK','TFG.BK','TIDLOR.BK','TISCO.BK','TLI.BK','TOA.BK',
-    'TOP.BK','TRUE.BK','TTB.BK','TU.BK','VGI.BK','WHA.BK','WHAUP.BK'
-]
+#stocks = [
+#    'PTT.BK','PTTEP.BK', 'AOT.BK','KTB.BK','BBL.BK', 'SCB.BK', 'KBANK.BK', 'ADVANC.BK', 'DELTA.BK', 'AP.BK',
+#    'CRC.BK','CPALL.BK','GULF.BK','HMPRO.BK','CK.BK','STECON.BK','BDMS.BK','BH.BK','AAV.BK','AEONTS.BK','AMATA.BK',
+#    'AURA.BK','AWC.BK','BA.BK','BAM.BK','BANPU.BK','BCH.BK','BCP.BK','BCPG.BK','BDMS.BK','BEM.BK',
+#    'BGRIM.BK','BJC.BK','BLA.BK','BTG.BK','CBG.BK','CCET.BK','CENTEL.BK','CHG.BK','COM7.BK','CPF.BK','CPN.BK',
+#    'CRC.BK','DOHOME.BK','EA.BK','EGCO.BK','ERW.BK','GLOBAL.BK','GPSC.BK','GULF.BK','GUNKUL.BK','HANA.BK',
+#    'HMPRO.BK','ICHI.BK','IRPC.BK','ITC.BK','IVL.BK','JAS.BK','JMART.BK','JMT.BK','JTS.BK','KCE.BK',
+#    'KKP.BK','LH.BK','M.BK','MBK.BK','MEGA.BK','MINT.BK','MOSHI.BK','MTC.BK','OR.BK','OSP.BK','PLANB.BK','PR9.BK',
+#    'PRM.BK','PTTGC.BK','QH.BK','RATCH.BK','RCL.BK','SAWAD.BK','SCC.BK','SCGP.BK','SIRI.BK','SISB.BK','SJWD.BK',
+#    'SPALI.BK','SPRC.BK','STA.BK','STGT.BK','TASCO.BK','TCAP.BK','TFG.BK','TIDLOR.BK','TISCO.BK','TLI.BK','TOA.BK',
+#    'TOP.BK','TRUE.BK','TTB.BK','TU.BK','VGI.BK','WHA.BK','WHAUP.BK'
+#]
+stocks = ['PTT.BK','PTTEP.BK', 'AOT.BK','KTB.BK','BBL.BK', 'SCB.BK', 'KBANK.BK', 'ADVANC.BK', 'DELTA.BK', 'AP.BK']
 
 summary, margin = get_stock_summary(stocks)
 summary = pd.DataFrame(summary)
@@ -217,14 +218,17 @@ for i, equity in enumerate(equity_list):
     if len(df) == 0 or (today - last_data_date).days >= 2 or df.empty:
         df_new = yfdownload(equity,start_date,today)
         # drop data today
-        df_new = df_new[df_new['Date'] != today] # remove today data becasue the close price will be updated at the end of the day.
+        df_new = df_new[df_new['Date'] != today] # remove today data because the close price will be updated at the end of the day.
         # --- Append only new rows (avoid duplicates on Date + Ticker) ---
         existing_pairs = set(zip(df["Date"], df["Ticker"]))
         mask_new = ~df_new.apply(lambda row: (str(row["Date"]), row["Ticker"]) in existing_pairs, axis=1)
         new_rows = df_new[mask_new]
 
         stock_data_df = pd.concat([stock_data_df, new_rows], ignore_index=True)
+        stock_data_df['Date'] = pd.to_datetime(stock_data_df['Date'], errors='coerce')
+        stock_data_df['Date'] = stock_data_df['Date'].dt.strftime('%Y-%m-%d %H:%M:%S')
         stock_data_df = stock_data_df.drop_duplicates(subset=['Ticker', 'Date'])
+
         stock_data_df.to_csv("stock_data.csv", index=False)
         stock_data_df = pd.read_csv("stock_data.csv")
         df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
@@ -233,6 +237,7 @@ for i, equity in enumerate(equity_list):
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
     # 2. Format them to the desired string format
     df['Date'] = df['Date'].dt.strftime('%Y-%m-%d %H:%M:%S')
+
     last_data_date = df["Date"].iloc[-1]
     print(df.tail())
     print(f'lastdate : {last_data_date}')
@@ -307,11 +312,17 @@ for i, equity in enumerate(equity_list):
         # --- SELL ---
         else:  # only if we are in a position
             cum_return = (price - buy_price) / buy_price
+            print(i)
+            print(f'cum_return: {cum_return}')
+            print(f'ma_reverse signal: {ma_reverse_signal}')
+            print(f'price: {price}')
+            print(f'ma200: {df.loc[index,'200d']}')
 
             # sell conditions
             sell_condition = (
-                (cum_return >= 0.1 and ma_reverse_signal) or
-                (cum_return <= -0.5 and (price / df.loc[index, '200d']) < 1)
+                    ((cum_return >= 0.1) | (cum_return <= -0.05)) &
+                    (ma_reverse_signal) &
+                    ((price / df.loc[index, '200d']) < 1)
             )
 
             if sell_condition:
