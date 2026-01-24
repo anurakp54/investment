@@ -57,7 +57,10 @@ def plot_result_altair(df, equity):
             title='Close Price',
             scale=alt.Scale(domain=[df['Close'].min(), df['Close'].max()])
         ),
-        tooltip=['Date', 'Close']
+        tooltip=[
+            alt.Tooltip('Date:T', title='Date', format='%d/%m/%y'),
+            alt.Tooltip('Close:Q', title='Close')
+        ]
     )
 
     # --- 200-day MA line ---
@@ -179,7 +182,7 @@ else:
 
 
 today = date.today()
-start_date = str(date.today() - timedelta(days=2000))
+start_date = str(date.today() - timedelta(days=1000))
 results = []
 # initialize with expected columns
 stock_data_df = pd.DataFrame(columns=["Date", "Ticker", "Open", "High", "Low", "Close", "Volume"])
@@ -207,7 +210,7 @@ for i, equity in enumerate(equity_list):
     print(df.tail())
 
     if df.empty:
-        last_data_date = date.today() - timedelta(days=20)
+        last_data_date = start_date
     else:
         last_data_date = df["Date"].iloc[-1]
 
@@ -216,7 +219,7 @@ for i, equity in enumerate(equity_list):
     print(f'today: {today}')
 
     if len(df) == 0 or (today - last_data_date).days >= 2 or df.empty:
-        df_new = yfdownload(equity,start_date,today)
+        df_new = yfdownload(equity,last_data_date,today)
         # drop data today
         df_new = df_new[df_new['Date'] != today] # remove today data because the close price will be updated at the end of the day.
         # --- Append only new rows (avoid duplicates on Date + Ticker) ---
@@ -415,5 +418,5 @@ else:
     st.write(f"Total Current Value: {total_realized_value:,.2f} THB")
     st.write(f"Total Realized Profit: {total_realized_profit:,.2f} THB")
     st.write(f"Realized Profit %: {total_margin:.2%}")
-    st.write(f'Total_Profit Value: {total_value:,.2f}')
-    st.write(f'Total_Profit Margin: {total_value_margin:,.2%}')
+    st.write(f'Total_Profit Value (Accum from begin): {total_value:,.2f}')
+    st.write(f'Total_Profit Margin (Accum from begin): {total_value_margin:,.2%}')
