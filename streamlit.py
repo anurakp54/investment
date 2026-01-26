@@ -5,7 +5,7 @@ from datetime import date, timedelta
 import yfinance as yf
 import numpy as np
 import matplotlib.pyplot as plt
-import os
+import utilities
 import stock_scan as sc
 
 plt.style.use('fivethirtyeight')
@@ -16,24 +16,6 @@ st.set_page_config(layout='wide')
 def get_stock_summary(stocks):
     summary, margin = sc.stock_scan(stocks)
     return summary, margin
-
-def yfdownload(equity,start_date,today):
-    # Download new data
-    df_new = yf.download(equity, start=start_date, end=today, group_by='ticker')
-
-    # --- Flatten MultiIndex if exists ---
-    if isinstance(df_new.columns, pd.MultiIndex):
-        df_new = df_new[equity].copy()
-
-    # Reset index and add Ticker column
-    df_new.reset_index(inplace=True)
-    df_new["Ticker"] = equity
-
-    # Ensure consistent column order
-    df_new = df_new[['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Ticker']]
-
-    return df_new
-
 
 def compute_unrealized(row):
     if row['in position'] and row['number_of_stock'] > 0:
@@ -142,10 +124,10 @@ def plot_result_altair(df, equity):
 #]
 stocks = ['PTT.BK','PTTEP.BK', 'AOT.BK','KTB.BK','BBL.BK', 'SCB.BK', 'KBANK.BK', 'ADVANC.BK', 'DELTA.BK', 'AP.BK']
 
-summary, margin = get_stock_summary(stocks)
-summary = pd.DataFrame(summary)
-st.write(summary)
-st.write(f'overall margin: {margin:,.2%}')
+#summary, margin = get_stock_summary(stocks)
+#summary = pd.DataFrame(summary)
+#st.write(summary)
+#st.write(f'overall margin: {margin:,.2%}')
 
 # INPUT STOCK and CHECK Data if avaliable and uptodate
 with st.sidebar:
@@ -189,62 +171,20 @@ stock_data_df = pd.DataFrame(columns=["Date", "Ticker", "Open", "High", "Low", "
 df = pd.DataFrame(columns=["Date", "Ticker", "Open", "High", "Low", "Close", "Volume"])
 print(equity_list)
 
+try:
+    stock_data_df = pd.read_csv("stock_data.csv")
+except:
+    stock_data_df = pd.DataFrame(columns=df.columns)
+
 for i, equity in enumerate(equity_list):
     print(f'equity: {equity}')
+    today = date.today() - timedelta(days=1)
+    start_date = str(date.today() - timedelta(days=period))
+    _, stock_data_df = utilities.get_stock_data_csv('stock_data.csv', equity, period)
 
     investment = 100000
-    # --- 1. Load data ---
-    try:
-        stock_data_df = pd.read_csv("stock_data.csv")
-    except:
-        stock_data_df = pd.DataFrame(columns=df.columns)
-
     df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
 
-    # 1. Parse all date formats automatically
-    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-
-    # 2. Format them to the desired string format
-    df['Date'] = df['Date'].dt.strftime('%Y-%m-%d %H:%M:%S')
-
-    print(df.tail())
-
-    if df.empty:
-        last_data_date = start_date
-    else:
-        last_data_date = df["Date"].iloc[-1]
-
-    today = pd.Timestamp.today().normalize()
-    last_data_date = pd.to_datetime(last_data_date)
-    print(f'today: {today}')
-
-    if len(df) == 0 or (today - last_data_date).days >= 2 or df.empty:
-        df_new = yfdownload(equity,last_data_date,today)
-        # drop data today
-        df_new = df_new[df_new['Date'] != today] # remove today data because the close price will be updated at the end of the day.
-        # --- Append only new rows (avoid duplicates on Date + Ticker) ---
-        existing_pairs = set(zip(df["Date"], df["Ticker"]))
-        mask_new = ~df_new.apply(lambda row: (str(row["Date"]), row["Ticker"]) in existing_pairs, axis=1)
-        new_rows = df_new[mask_new]
-
-        stock_data_df = pd.concat([stock_data_df, new_rows], ignore_index=True)
-        stock_data_df['Date'] = pd.to_datetime(stock_data_df['Date'], errors='coerce')
-        stock_data_df['Date'] = stock_data_df['Date'].dt.strftime('%Y-%m-%d %H:%M:%S')
-        stock_data_df = stock_data_df.drop_duplicates(subset=['Ticker', 'Date'])
-
-        stock_data_df.to_csv("stock_data.csv", index=False)
-        stock_data_df = pd.read_csv("stock_data.csv")
-        df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
-
-    # 1. Parse all date formats automatically
-    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-    # 2. Format them to the desired string format
-    df['Date'] = df['Date'].dt.strftime('%Y-%m-%d %H:%M:%S')
-
-    last_data_date = df["Date"].iloc[-1]
-    print(df.tail())
-    print(f'lastdate : {last_data_date}')
-    df = df.set_index('Date')
     df['return'] = df['Close'].pct_change()
     df['ln_r'] = np.log(1 + df['return'])
 
@@ -254,10 +194,6 @@ for i, equity in enumerate(equity_list):
     df['moving_avg_rolling_mean'] = df['rolling_mean_ln_r'].rolling(window=60).mean()
 
     df = df[-period:]  # filter data to last 250 days
-    try:
-        check_if_equity_is_on_list = summary[summary['equity'] == equity]['in position'].values[0]
-    except:
-        check_if_equity_is_on_list = False
 
     #if (df.iloc[-1]['Close'] >= df.iloc[-1]['200d']) or check_if_equity_is_on_list == True:
     #    print('In Position')
@@ -278,71 +214,83 @@ for i, equity in enumerate(equity_list):
     investment = 100000  # starting capital
     df['position'] = 0
     df['profit'] = 0.0
+    print(f'df: {df[['Date','Close','200d']]}')
 
-    for i, index in enumerate(df.index):
-        if i < 3:
+    for pos, (idx, row) in enumerate(df.iterrows()):
+        if pos < 3:
             continue
 
-        price = df.loc[index, 'Close']
+        price = row['Close']
 
         # detect rebound for buy
         ma_min = df['moving_avg_rolling_mean'].min()
         ma_max = df['moving_avg_rolling_mean'].max()
         ma_threshold = ma_min + 0.5 * (ma_max - ma_min)
 
-        ma_prev3 = df.iloc[i - 3]['moving_avg_rolling_mean']
-        ma_prev2 = df.iloc[i - 2]['moving_avg_rolling_mean']
-        ma_prev1 = df.iloc[i - 1]['moving_avg_rolling_mean']
-        ma_curr = df.iloc[i]['moving_avg_rolling_mean']
-        ma_rebound_signal = (ma_curr <= ma_threshold and
-                             ma_curr > ma_prev1 and ma_prev1 > ma_prev2)
+        ma_prev3 = df.iloc[pos - 3]['moving_avg_rolling_mean']
+        ma_prev2 = df.iloc[pos - 2]['moving_avg_rolling_mean']
+        ma_prev1 = df.iloc[pos - 1]['moving_avg_rolling_mean']
+        ma_curr = df.iloc[pos]['moving_avg_rolling_mean']
+
+        ma_rebound_signal = (
+                ma_curr <= ma_threshold and
+                ma_curr > ma_prev1 and
+                ma_prev1 > ma_prev2
+        )
 
         ma_reverse_signal = ma_curr < ma_prev1 and ma_prev1 < ma_prev2
-
         days_after_sell += 1
 
         # --- BUY ---
         if not in_position:
-            if pd.notna(ma_curr) and ma_rebound_signal and (price / df.loc[index, '200d']) >= 1 and days_after_sell > 15:
-                df.loc[index, 'position'] = 1
+            price = row['Close']
+            ma200 = row['200d']
+            print(f'ma200: {ma200}')
+            print(f'ma_rebound_signal: {ma_rebound_signal}')
+            print(f'price/ma200: {price/ma200}')
+            print(f'days_after_sell: {days_after_sell}')
+            if (
+                    pd.notna(ma_curr)
+                    and ma_rebound_signal
+                    and (price / ma200) >= 1
+                    and days_after_sell > 15
+            ):
+                df.at[idx, 'position'] = 1  # at[] is faster for scalar writes
                 buy_price = price
-                buy_index = index
+                buy_index = idx
                 in_position = True
                 number_of_stock = investment / buy_price
+
                 print('buy price:', buy_price)
                 print('number of stock:', number_of_stock)
 
         # --- SELL ---
-        else:  # only if we are in a position
+        else:
             cum_return = (price - buy_price) / buy_price
-            print(i)
-            print(f'cum_return: {cum_return}')
-            print(f'ma_reverse signal: {ma_reverse_signal}')
-            print(f'price: {price}')
-            print(f'ma200: {df.loc[index,'200d']}')
+            ma200 = row['200d']
 
-            # sell conditions
             sell_condition = (
-                    ((cum_return >= 0.1) | (cum_return <= -0.05)) &
-                    (ma_reverse_signal) &
-                    ((price / df.loc[index, '200d']) < 1)
+                    ((cum_return >= 0.1) or (cum_return <= -0.05))
+                    and ma_reverse_signal
+                    and (price / ma200) < 1
             )
 
             if sell_condition:
                 sell_price = price
                 investment = sell_price * number_of_stock
-                df.loc[index, 'position'] = -1
-                df.loc[index, 'profit'] = (sell_price - buy_price)*number_of_stock
-                sell_index = index
-                number_of_stock = 0
+
+                df.at[idx, 'position'] = -1
+                df.at[idx, 'profit'] = (sell_price - buy_price) * number_of_stock
+
+                sell_index = idx
                 days_after_sell = 0
-                # reset state
                 in_position = False
 
-                print('sell date: ', sell_index )
-                print('sell price: ', sell_price)
-                print('buy price: ', buy_price)
+                print('sell date:', sell_index)
+                print('sell price:', sell_price)
+                print('buy price:', buy_price)
                 print('profit: ', (sell_price - buy_price)*number_of_stock)
+                number_of_stock = 0
 
     # --- 3. Compute cumulative profit ---
     df['cum_profit'] = df['profit'].cumsum()
@@ -393,7 +341,6 @@ else:
 
     # Total profit per stock: realized + unrealized
     result['total_profit'] = result['cum_profit'] + result['unrealized_profit']
-
     # Pretty-print summary
 
     summary = result[['equity', 'in position','buy_price' ,'price', 'number_of_stock', 'cum_profit', 'unrealized_profit', 'total_profit', 'current_portfolio_value', 'profit_margin']].copy()

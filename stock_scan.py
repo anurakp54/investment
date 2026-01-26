@@ -74,149 +74,125 @@ def stock_scan(equity_list):
         # --- 1. Load data ---
         try:
             stock_data_df = pd.read_csv("stock_data.csv")
-        except:
-            stock_data_df = pd.DataFrame(columns=["Date", "Ticker", "Open", "High", "Low", "Close", "Volume"])
 
-        df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce').dt.normalize()
-
-        if df.empty:
-            pass
-        else:
-            last_data_date = df["Date"].iloc[-1]
-
-        today = pd.Timestamp.today().normalize()
-        start_date = str(date.today() - timedelta(days=2000))
-
-        if len(df) == 0 or (today - last_data_date).days > 2 or df.empty:
-            df_new = yfdownload(equity, start_date,today)
-            # --- Append only new rows (avoid duplicates on Date + Ticker) ---
-            existing_pairs = set(zip(df["Date"], df["Ticker"]))
-            mask_new = ~df_new.apply(lambda row: (str(row["Date"]), row["Ticker"]) in existing_pairs, axis=1)
-            new_rows = df_new[mask_new]
-
-            stock_data_df = pd.concat([stock_data_df, new_rows], ignore_index=True)
-            stock_data_df = stock_data_df.drop_duplicates()
-            stock_data_df.to_csv("stock_data.csv", index=False)
-            stock_data_df = pd.read_csv("stock_data.csv")
+            df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce').dt.normalize()
+            print(df)
             df = stock_data_df[stock_data_df["Ticker"] == equity].copy()
 
-        last_data_date = df["Date"].iloc[-1]
-        print(f'lastdate : {last_data_date}')
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce').dt.normalize()
-        df = df.set_index('Date')
-        df['return'] = df['Close'].pct_change()
-        df['ln_r'] = np.log(1 + df['return'])
+            df['return'] = df['Close'].pct_change()
+            df['ln_r'] = np.log(1 + df['return'])
 
-        # --- Rolling statistics ---
-        df['200d'] = df['Close'].rolling(window=200).mean()
-        df['rolling_mean_ln_r'] = df['ln_r'].rolling(window=30).mean()
-        df['moving_avg_rolling_mean'] = df['rolling_mean_ln_r'].rolling(window=60).mean()
+            # --- Rolling statistics ---
+            df['200d'] = df['Close'].rolling(window=200).mean()
+            df['rolling_mean_ln_r'] = df['ln_r'].rolling(window=30).mean()
+            df['moving_avg_rolling_mean'] = df['rolling_mean_ln_r'].rolling(window=60).mean()
 
-        df = df[-250:]  # filter data to last 250 days
+            df = df[-250:]  # filter data to last 250 days
 
-        if df.iloc[-1]['Close'] >= df.iloc[-1]['200d']:
-            try:
+            if df.iloc[-1]['Close'] >= df.iloc[-1]['200d']:
+                try:
 
-                # --- Initialize trading columns ---
-                df['position'] = 0      # 1 = buy, -1 = sell, 0 = hold
-                df['cum_return'] = 0.0  # return since last buy
-                df['profit'] = 0.0      # profit of each completed trade
-                df['cum_profit'] = 0.0  # cumulative profit
+                    # --- Initialize trading columns ---
+                    df['position'] = 0      # 1 = buy, -1 = sell, 0 = hold
+                    df['cum_return'] = 0.0  # return since last buy
+                    df['profit'] = 0.0      # profit of each completed trade
+                    df['cum_profit'] = 0.0  # cumulative profit
 
-                # --- 2. Trading loop: buy first, sell alternately ---
-                in_position = False
-                buy_price = None
-                buy_index = None
-                sell_index = None
-                days_after_sell = 0
-                number_of_stock = 0
-                investment = 100000  # starting capital
-                df['position'] = 0
-                df['profit'] = 0.0
+                    # --- 2. Trading loop: buy first, sell alternately ---
+                    in_position = False
+                    buy_price = None
+                    buy_index = None
+                    sell_index = None
+                    days_after_sell = 0
+                    number_of_stock = 0
+                    investment = 100000  # starting capital
+                    df['position'] = 0
+                    df['profit'] = 0.0
 
-                for i, index in enumerate(df.index):
-                    if i < 3:
-                        continue
+                    for i, index in enumerate(df.index):
+                        if i < 3:
+                            continue
 
-                    price = df.loc[index, 'Close']
+                        price = df.loc[index, 'Close']
 
-                    # detect rebound for buy
-                    ma_min = df['moving_avg_rolling_mean'].min()
-                    ma_max = df['moving_avg_rolling_mean'].max()
-                    ma_threshold = ma_min + 0.5 * (ma_max - ma_min)
+                        # detect rebound for buy
+                        ma_min = df['moving_avg_rolling_mean'].min()
+                        ma_max = df['moving_avg_rolling_mean'].max()
+                        ma_threshold = ma_min + 0.5 * (ma_max - ma_min)
 
-                    ma_prev3 = df.iloc[i - 3]['moving_avg_rolling_mean']
-                    ma_prev2 = df.iloc[i - 2]['moving_avg_rolling_mean']
-                    ma_prev1 = df.iloc[i - 1]['moving_avg_rolling_mean']
-                    ma_curr = df.iloc[i]['moving_avg_rolling_mean']
-                    ma_rebound_signal = (ma_curr <= ma_threshold and
-                                         ma_curr > ma_prev1 and ma_prev1 > ma_prev2)
+                        ma_prev3 = df.iloc[i - 3]['moving_avg_rolling_mean']
+                        ma_prev2 = df.iloc[i - 2]['moving_avg_rolling_mean']
+                        ma_prev1 = df.iloc[i - 1]['moving_avg_rolling_mean']
+                        ma_curr = df.iloc[i]['moving_avg_rolling_mean']
+                        ma_rebound_signal = (ma_curr <= ma_threshold and
+                                             ma_curr > ma_prev1 and ma_prev1 > ma_prev2)
 
-                    ma_reverse_signal = ma_curr < ma_prev1 and ma_prev1 < ma_prev2
+                        ma_reverse_signal = ma_curr < ma_prev1 and ma_prev1 < ma_prev2
 
-                    days_after_sell += 1
+                        days_after_sell += 1
 
-                    # --- BUY ---
-                    if not in_position:
-                        if pd.notna(ma_curr) and ma_rebound_signal and (price / df.loc[index, '200d']) >= 1 and days_after_sell > 15:
-                            df.loc[index, 'position'] = 1
-                            buy_price = price
-                            buy_index = index
-                            in_position = True
-                            number_of_stock = investment / buy_price
-                            print('buy price:', buy_price)
-                            print('number of stock:', number_of_stock)
+                        # --- BUY ---
+                        if not in_position:
+                            if pd.notna(ma_curr) and ma_rebound_signal and (price / df.loc[index, '200d']) >= 1 and days_after_sell > 15:
+                                df.loc[index, 'position'] = 1
+                                buy_price = price
+                                buy_index = index
+                                in_position = True
+                                number_of_stock = investment / buy_price
+                                print('buy price:', buy_price)
+                                print('number of stock:', number_of_stock)
 
-                    # --- SELL ---
-                    else:  # only if we are in a position
-                        cum_return = (price - buy_price) / buy_price
+                        # --- SELL ---
+                        else:  # only if we are in a position
+                            cum_return = (price - buy_price) / buy_price
 
-                        # sell conditions
-                        sell_condition = (
-                            (cum_return >= 0.1 and ma_reverse_signal) or
-                            (cum_return <= -0.5 and (price / df.loc[index, '200d']) < 1)
-                        )
+                            # sell conditions
+                            sell_condition = (
+                                (cum_return >= 0.1 and ma_reverse_signal) or
+                                (cum_return <= -0.5 and (price / df.loc[index, '200d']) < 1)
+                            )
 
-                        if sell_condition:
-                            sell_price = price
-                            investment = sell_price * number_of_stock
-                            df.loc[index, 'position'] = -1
-                            df.loc[index, 'profit'] = (sell_price - buy_price)*number_of_stock
-                            sell_index = index
-                            number_of_stock = 0
-                            days_after_sell = 0
-                            # reset state
-                            in_position = False
+                            if sell_condition:
+                                sell_price = price
+                                investment = sell_price * number_of_stock
+                                df.loc[index, 'position'] = -1
+                                df.loc[index, 'profit'] = (sell_price - buy_price)*number_of_stock
+                                sell_index = index
+                                number_of_stock = 0
+                                days_after_sell = 0
+                                # reset state
+                                in_position = False
 
-                            print('sell date: ', sell_index )
-                            print('sell price: ', sell_price)
-                            print('buy price: ', buy_price)
-                            print('profit: ', (sell_price - buy_price)*number_of_stock)
+                                print('sell date: ', sell_index )
+                                print('sell price: ', sell_price)
+                                print('buy price: ', buy_price)
+                                print('profit: ', (sell_price - buy_price)*number_of_stock)
 
-                # --- 3. Compute cumulative profit ---
-                df['cum_profit'] = df['profit'].cumsum()
-                print(df[df['profit'] != 0][['Close', 'profit', 'cum_profit']])
-                print('initial investment = 100,000 THB')
-                print(f'Current Portfolio Value: {investment}, {((investment - 100000) / 100000):.2%},\n'
-                      f'price * stocks: {buy_price} x {number_of_stock}')
+                    # --- 3. Compute cumulative profit ---
+                    df['cum_profit'] = df['profit'].cumsum()
+                    print(df[df['profit'] != 0][['Close', 'profit', 'cum_profit']])
+                    print('initial investment = 100,000 THB')
+                    print(f'Current Portfolio Value: {investment}, {((investment - 100000) / 100000):.2%},\n'
+                          f'price * stocks: {buy_price} x {number_of_stock}')
 
-                row_result = {
-                    'equity': equity,
-                    'price': price,
-                    'in position': in_position,
-                    'number_of_stock': number_of_stock,
-                    'buy_price': buy_price if in_position else 0.0,  # store the buy price if in position
-                    'cum_profit': df['cum_profit'].iloc[-1] if not df['cum_profit'].empty else 0.0,
-                    'current_portfolio_value': investment,
-                    'profit_margin': ((investment - 100000) / 100000)
-                }
-                results.append(row_result)
+                    row_result = {
+                        'equity': equity,
+                        'price': price,
+                        'in position': in_position,
+                        'number_of_stock': number_of_stock,
+                        'buy_price': buy_price if in_position else 0.0,  # store the buy price if in position
+                        'cum_profit': df['cum_profit'].iloc[-1] if not df['cum_profit'].empty else 0.0,
+                        'current_portfolio_value': investment,
+                        'profit_margin': ((investment - 100000) / 100000)
+                    }
+                    results.append(row_result)
 
-                # 4. plot result
-                #plot_result(df, equity)
-                #plt.show(block=False)
-            except:pass
+                    # 4. plot result
+                    #plot_result(df, equity)
+                    #plt.show(block=False)
+                except:pass
+        except: pass
 
     result = pd.DataFrame(results)
     print(result)
